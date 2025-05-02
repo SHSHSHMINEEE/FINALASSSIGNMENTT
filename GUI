@@ -1,0 +1,387 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import pickle
+from datetime import datetime, timezone
+import re
+
+
+# Utility functions for pickle file handling
+def save_data(filename, data):
+    try:
+        with open(filename, "wb") as file:
+            pickle.dump(data, file)
+    except Exception as e:
+        print(f"Error saving data: {e}")
+
+
+def load_data(filename):
+    try:
+        with open(filename, "rb") as file:
+            return pickle.load(file)
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return []
+
+
+class TicketingSystemApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Ticketing System")
+        self.root.geometry("1000x700")
+
+        # Date and Time
+        self.current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Add current date/time and user login display
+        self.header_frame = tk.Frame(self.root)
+        self.header_frame.pack(fill="x", padx=5, pady=5)
+
+        tk.Label(self.header_frame, text=f"Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {self.current_time}").pack(anchor="w")
+        
+        # Create notebook for tabs
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(expand=True, fill="both")
+
+        # Initialize tabs
+        self.account_management_tab = tk.Frame(self.notebook)
+        self.ticket_purchasing_tab = tk.Frame(self.notebook)
+        self.admin_dashboard_tab = tk.Frame(self.notebook)
+
+        self.notebook.add(self.account_management_tab, text="Account Management")
+        self.notebook.add(self.ticket_purchasing_tab, text="Ticket Purchasing")
+        self.notebook.add(self.admin_dashboard_tab, text="Admin Dashboard")
+
+        # Initialize tab contents
+        self.init_account_management()
+        self.init_ticket_purchasing()
+        self.init_admin_dashboard()
+
+    def init_account_management(self):
+        # Title
+        title_frame = tk.Frame(self.account_management_tab)
+        title_frame.pack(fill="x", padx=10, pady=5)
+        tk.Label(title_frame, text="Account Management", font=("Arial", 20, "bold")).pack()
+
+        # Form Frame
+        form_frame = tk.Frame(self.account_management_tab)
+        form_frame.pack(padx=10, pady=5)
+
+        # Labels and Entries with consistent spacing
+        labels = ["User ID:", "Name:", "Email:", "Password:", "Phone Number:"]
+        self.account_entries = {}
+
+        for i, label in enumerate(labels):
+            tk.Label(form_frame, text=label, anchor="e").grid(row=i, column=0, padx=5, pady=5, sticky="e")
+            entry = tk.Entry(form_frame)
+            entry.grid(row=i, column=1, padx=5, pady=5, sticky="ew")
+            self.account_entries[label.lower().replace(":", "").replace(" ", "_")] = entry
+
+        # Show/Hide password button
+        self.password_shown = False
+        self.show_password_btn = tk.Button(form_frame, text="Show", command=self.toggle_password)
+        self.show_password_btn.grid(row=3, column=2, padx=5)
+
+        # Buttons Frame
+        btn_frame = tk.Frame(self.account_management_tab)
+        btn_frame.pack(pady=10)
+
+        buttons = [
+            ("Add Customer", self.add_customer),
+            ("Modify Customer", self.modify_customer),
+            ("Delete Customer", self.delete_customer),
+            ("View Customers", self.view_customers),
+            ("Clear Fields", self.clear_fields)
+        ]
+
+        for i, (text, command) in enumerate(buttons):
+            tk.Button(btn_frame, text=text, command=command, width=15).grid(row=0, column=i, padx=5)
+
+        # Display Area
+        self.display_area = tk.Text(self.account_management_tab, height=15, width=80)
+        self.display_area.pack(padx=10, pady=5)
+
+    def toggle_password(self):
+        entry = self.account_entries["password"]
+        if self.password_shown:
+            entry.configure(show="*")
+            self.show_password_btn.configure(text="Show")
+        else:
+            entry.configure(show="")
+            self.show_password_btn.configure(text="Hide")
+        self.password_shown = not self.password_shown
+
+    def clear_fields(self):
+        for entry in self.account_entries.values():
+            entry.delete(0, tk.END)
+
+    def validate_inputs(self):
+        user_id = self.account_entries["user_id"].get()
+        name = self.account_entries["name"].get()
+        email = self.account_entries["email"].get()
+        phone = self.account_entries["phone_number"].get()
+
+        if not all([user_id, name, email, phone]):
+            messagebox.showerror("Error", "All fields are required!")
+            return False
+
+        if not user_id.isdigit():
+            messagebox.showerror("Error", "User ID must contain only numbers!")
+            return False
+
+        if not name.replace(" ", "").isalpha():
+            messagebox.showerror("Error", "Name must contain only letters!")
+            return False
+
+        if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            messagebox.showerror("Error", "Invalid email format!")
+            return False
+
+        if not phone.isdigit() or len(phone) != 10:
+            messagebox.showerror("Error", "Phone number must be 10 digits!")
+            return False
+
+        return True
+
+    def add_customer(self):
+        if not self.validate_inputs():
+            return
+
+        customer_data = {
+            "user_id": self.account_entries["user_id"].get(),
+            "name": self.account_entries["name"].get(),
+            "email": self.account_entries["email"].get(),
+            "password": self.account_entries["password"].get(),
+            "phone": self.account_entries["phone_number"].get()
+        }
+
+        customers = load_data("customers.pkl")
+
+        # Check if user_id already exists
+        if any(c["user_id"] == customer_data["user_id"] for c in customers):
+            messagebox.showerror("Error", "User ID already exists!")
+            return
+
+        customers.append(customer_data)
+        save_data("customers.pkl", customers)
+        messagebox.showinfo("Success", "Customer added successfully!")
+        self.clear_fields()
+        self.view_customers()
+
+    def modify_customer(self):
+        if not self.validate_inputs():
+            return
+
+        user_id = self.account_entries["user_id"].get()
+        customers = load_data("customers.pkl")
+
+        for i, customer in enumerate(customers):
+            if customer["user_id"] == user_id:
+                customers[i] = {
+                    "user_id": user_id,
+                    "name": self.account_entries["name"].get(),
+                    "email": self.account_entries["email"].get(),
+                    "password": self.account_entries["password"].get(),
+                    "phone": self.account_entries["phone_number"].get()
+                }
+                save_data("customers.pkl", customers)
+                messagebox.showinfo("Success", "Customer modified successfully!")
+                self.clear_fields()
+                self.view_customers()
+                return
+
+        messagebox.showerror("Error", "Customer not found!")
+
+    def delete_customer(self):
+        user_id = self.account_entries["user_id"].get()
+        if not user_id:
+            messagebox.showerror("Error", "Please enter a User ID!")
+            return
+
+        customers = load_data("customers.pkl")
+        original_length = len(customers)
+        customers = [c for c in customers if c["user_id"] != user_id]
+
+        if len(customers) == original_length:
+            messagebox.showerror("Error", "Customer not found!")
+            return
+
+        save_data("customers.pkl", customers)
+        messagebox.showinfo("Success", "Customer deleted successfully!")
+        self.clear_fields()
+        self.view_customers()
+
+    def view_customers(self):
+        self.display_area.delete(1.0, tk.END)
+        customers = load_data("customers.pkl")
+
+        if not customers:
+            self.display_area.insert(tk.END, "No customers found.")
+            return
+
+        header = f"{'User ID':<10} {'Name':<20} {'Email':<30} {'Phone':<15}\n"
+        self.display_area.insert(tk.END, header)
+        self.display_area.insert(tk.END, "-" * 75 + "\n")
+
+        for customer in customers:
+            line = f"{customer['user_id']:<10} {customer['name']:<20} {customer['email']:<30} {customer['phone']:<15}\n"
+            self.display_area.insert(tk.END, line)
+
+    def init_ticket_purchasing(self):
+        # Title
+        title_frame = tk.Frame(self.ticket_purchasing_tab)
+        title_frame.pack(fill="x", padx=10, pady=5)
+        tk.Label(title_frame, text="Ticket Purchasing", font=("Arial", 20, "bold")).pack()
+
+        # Ticket Type Options
+        options_frame = tk.Frame(self.ticket_purchasing_tab)
+        options_frame.pack(padx=10, pady=5)
+
+        tk.Label(options_frame, text="Select Ticket Type:").grid(row=0, column=0, padx=5, pady=5)
+        self.ticket_type = ttk.Combobox(options_frame,
+                                         values=["Single Race - $100", "Weekend Pass - $250", "Group Discount - $400"])
+        self.ticket_type.grid(row=0, column=1, padx=5, pady=5)
+
+        # Quantity Selection
+        tk.Label(options_frame, text="Enter Quantity:").grid(row=1, column=0, padx=5, pady=5)
+        self.quantity_entry = tk.Entry(options_frame)
+        self.quantity_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        # Price Display
+        price_frame = tk.Frame(self.ticket_purchasing_tab)
+        price_frame.pack(padx=10, pady=5)
+
+        tk.Label(price_frame, text="Total Price:").grid(row=0, column=0, padx=5, pady=5)
+        self.total_price_label = tk.Label(price_frame, text="$0.00")
+        self.total_price_label.grid(row=0, column=1, padx=5, pady=5)
+
+        # Payment Section
+        payment_frame = tk.Frame(self.ticket_purchasing_tab)
+        payment_frame.pack(padx=10, pady=5)
+
+        tk.Label(payment_frame, text="Enter Card Details:").grid(row=0, column=0, padx=5, pady=5)
+        self.card_entry = tk.Entry(payment_frame)
+        self.card_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        # Payment Method Selection
+        tk.Label(payment_frame, text="Select Payment Method:").grid(row=1, column=0, padx=5, pady=5)
+        self.payment_method = ttk.Combobox(payment_frame, values=["Credit Card", "Debit Card"])
+        self.payment_method.grid(row=1, column=1, padx=5, pady=5)
+
+        # Buttons
+        btn_frame = tk.Frame(self.ticket_purchasing_tab)
+        btn_frame.pack(pady=10)
+
+        tk.Button(btn_frame, text="Calculate Total", command=self.calculate_total).grid(row=0, column=0, padx=5)
+        tk.Button(btn_frame, text="Confirm Purchase", command=self.confirm_purchase).grid(row=0, column=1, padx=5)
+
+    def calculate_total(self):
+        ticket_type = self.ticket_type.get()
+        quantity = self.quantity_entry.get()
+
+        if not ticket_type or not quantity.isdigit():
+            messagebox.showerror("Error", "Please select a ticket type and enter a valid quantity.")
+            return
+
+        quantity = int(quantity)
+        price_per_ticket = int(ticket_type.split("- $")[-1])
+        total_price = price_per_ticket * quantity
+        self.total_price_label.config(text=f"${total_price:.2f}")
+
+    def confirm_purchase(self):
+        ticket_type = self.ticket_type.get()
+        quantity = self.quantity_entry.get()
+        card_number = self.card_entry.get()
+        payment_method = self.payment_method.get()
+
+        if not all([ticket_type, quantity, card_number, payment_method]):
+            messagebox.showerror("Error", "All fields are required.")
+            return
+
+        if payment_method == "Credit Card" and (not card_number.isdigit() or len(card_number) != 16):
+            messagebox.showerror("Error", "Credit card number must be 16 digits.")
+            return
+        elif payment_method == "Debit Card" and not card_number.isdigit():
+            messagebox.showerror("Error", "Debit card number must contain only digits.")
+            return
+
+        try:
+            quantity = int(quantity)
+            price_per_ticket = int(ticket_type.split("- $")[-1])
+            total_price = price_per_ticket * quantity
+
+            # Save the order
+            orders = load_data("orders.pkl")
+            orders.append({"ticket_type": ticket_type, "quantity": quantity, "total_price": total_price,
+                           "date": datetime.now(), "card_number": card_number, "payment_method": payment_method})
+            save_data("orders.pkl", orders)
+            messagebox.showinfo("Success", f"Purchase confirmed. Total: ${total_price:.2f}")
+        except ValueError:
+            messagebox.showerror("Error", "Invalid input. Please check your entries.")
+
+    def init_admin_dashboard(self):
+        # Title
+        title_frame = tk.Frame(self.admin_dashboard_tab)
+        title_frame.pack(fill="x", padx=10, pady=5)
+        tk.Label(title_frame, text="Admin Dashboard", font=("Arial", 20, "bold")).pack()
+
+        # Ticket Sales Overview
+        sales_frame = tk.Frame(self.admin_dashboard_tab)
+        sales_frame.pack(padx=10, pady=5)
+
+        tk.Label(sales_frame, text="Ticket Sales Overview").pack()
+        self.sales_table = ttk.Treeview(sales_frame, columns=("Date", "Tickets Sold"), show="headings")
+        self.sales_table.heading("Date", text="Date")
+        self.sales_table.heading("Tickets Sold", text="Tickets Sold")
+        self.sales_table.pack()
+
+        # Load and display sales data
+        self.load_sales_data()
+
+        # Modify Discounts
+        discount_frame = tk.Frame(self.admin_dashboard_tab)
+        discount_frame.pack(padx=10, pady=5)
+
+        tk.Label(discount_frame, text="Modify Discounts").pack()
+        tk.Label(discount_frame, text="Enter Discount Percentage:").pack()
+        self.discount_entry = tk.Entry(discount_frame)
+        self.discount_entry.pack()
+
+        tk.Button(discount_frame, text="Update Discount", command=self.update_discount).pack(pady=10)
+
+    def load_sales_data(self):
+        # Clear existing data
+        for item in self.sales_table.get_children():
+            self.sales_table.delete(item)
+
+        # Load sales data from orders
+        orders = load_data("orders.pkl")
+        sales_data = {}
+        for order in orders:
+            date = order["date"].strftime("%Y-%m-%d")
+            if date in sales_data:
+                sales_data[date] += order["quantity"]
+            else:
+                sales_data[date] = order["quantity"]
+
+        # Insert data into the sales table
+        for date, tickets_sold in sales_data.items():
+            self.sales_table.insert("", tk.END, values=(date, tickets_sold))
+
+    def update_discount(self):
+        discount = self.discount_entry.get()
+        if not discount.isdigit() or int(discount) > 100 or int(discount) < 0:
+            messagebox.showerror("Error", "Enter a valid discount percentage between 0 and 100.")
+            return
+
+        discounts = load_data("discounts.pkl")
+        discounts.append({"discount": int(discount), "date": datetime.now()})
+        save_data("discounts.pkl", discounts)
+        messagebox.showinfo("Success", "Discount updated successfully!")
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = TicketingSystemApp(root)
+    root.mainloop()

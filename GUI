@@ -1,55 +1,58 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import pickle
-from datetime import datetime, timezone
-import re
-import os
+import tkinter as tk # GUI library for Python
+from tkinter import ttk, messagebox # For advanced widgets and dialogs
+import pickle # For saving/loading binary data
+from datetime import datetime, timezone # For current time
+import re # For regular expressions (e.g., email validation)
+import os # For directory and file handling
 
 # Utility functions for pickle file handling
-def save_data(filename, data):
+def save_data(filename, data): # Saves data to a .pkl file
     try:
         with open(filename, "wb") as file:
-            pickle.dump(data, file)
+            pickle.dump(data, file) # Serialize the data
     except Exception as e:
         print(f"Error saving data: {e}")
 
 
-def load_data(filename):
+def load_data(filename): # Loads data from a .pkl file
     try:
         with open(filename, "rb") as file:
             return pickle.load(file)
     except FileNotFoundError:
-        return []
+        return [] # Return empty if file doesn't exist
     except Exception as e:
         print(f"Error loading data: {e}")
         return []
 
 
 class TicketingSystemApp:
-    def __init__(self, root, user_email):
+    def __init__(self, root, user_email): # Constructor receives root window and user email
         self.root = root
-        self.user_email = user_email
+        self.user_email = user_email # Store email to differentiate between admin/user
         self.root.title("Ticketing System")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x700") # Set window size
 
+        # Get current date/time
         self.current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
+        # Header (shows date/time and logout button)
         self.header_frame = tk.Frame(self.root)
         self.header_frame.pack(fill="x", padx=5, pady=5)
         tk.Label(self.header_frame, text=f"Current Date and Time: {self.current_time}").pack(anchor="w")
 
         tk.Button(self.header_frame, text="Logout", command=self.logout).pack(side="right", padx=10)
 
+        # Create tab control (notebook)
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(expand=True, fill="both")
 
-        # Always initialize the tabs (needed later)
+        # Define all tab frames
         self.account_management_tab = tk.Frame(self.notebook)
         self.ticket_purchasing_tab = tk.Frame(self.notebook)
         self.admin_dashboard_tab = tk.Frame(self.notebook)
         self.order_history_tab = tk.Frame(self.notebook)
 
-        # Show tabs based on role
+        # Load tabs based on user role (admin or regular user)
         if "@admin.com" in self.user_email:
             self.notebook.add(self.account_management_tab, text="Account Management")
             self.notebook.add(self.admin_dashboard_tab, text="Admin Dashboard")
@@ -61,11 +64,11 @@ class TicketingSystemApp:
             self.init_ticket_purchasing()
             self.init_order_history()
 
-    def logout(self):
+    def logout(self):  # Logout function
         confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
         if confirm:
-            self.root.destroy()
-            login_root = tk.Tk()
+            self.root.destroy() # Close current window
+            login_root = tk.Tk() # Open login window
             LoginWindow(login_root)
             login_root.mainloop()
 
@@ -159,7 +162,7 @@ class TicketingSystemApp:
             entry.pack(side="left")
             ticket_entries[t_type] = entry
 
-        # --- Save Button ---
+        # Save Button
         def save_changes():
             new_name = name_entry.get().strip()
             new_card = card_entry.get().strip()
@@ -775,6 +778,10 @@ class SignupWindow:
 
         if not user_id.isdigit():
             messagebox.showerror("Error", "User ID must be numeric.")
+            return
+
+        if email.endswith("@admin.com"):
+            messagebox.showerror("Error", "You cannot register as an admin.")
             return
 
         if not name.replace(" ", "").isalpha():

@@ -149,7 +149,7 @@ class TicketingSystemApp:
         method_combo.set(order.get("payment_method", ""))
         method_combo.pack()
 
-        # --- Ticket Quantities ---
+        #Ticket Quantities
         ticket_entries = {}
         tk.Label(top, text="Update Tickets:").pack(pady=5)
         for t_type in self.ticket_info:
@@ -160,8 +160,26 @@ class TicketingSystemApp:
             entry = tk.Entry(row, width=5)
             entry.insert(0, str(qty))
             entry.pack(side="left")
+            entry.bind("<KeyRelease>", lambda e, et=entry: update_total_price())  # Correct late binding
             ticket_entries[t_type] = entry
 
+        #Total Price Display
+        price_var = tk.StringVar()
+        price_var.set(f"Total Price: ${order.get('total_price', 0.0):.2f}")
+        price_label = tk.Label(top, textvariable=price_var, font=("Arial", 11, "bold"))
+        price_label.pack(pady=5)
+
+        def update_total_price():
+            try:
+                total = 0
+                for t_type, entry in ticket_entries.items():
+                    qty = int(entry.get())
+                    if qty < 0:
+                        raise ValueError
+                    total += qty * self.ticket_info[t_type]["price"]
+                price_var.set(f"Total Price: ${total:.2f}")
+            except:
+                price_var.set("Total Price: Error")
         # Save Button
         def save_changes():
             new_name = name_entry.get().strip()

@@ -462,7 +462,25 @@ class TicketingSystemApp:
                 total += qty * price
             except ValueError:
                 continue
-        self.total_price_label.config(text=f"${total:.2f}")
+
+        original_total = total
+
+        # Apply discount if available and not zero
+        discounts = load_data("discounts.pkl")
+        if discounts:
+            latest_discount = discounts[-1].get("discount", 0)
+            if latest_discount > 0:
+                discount_rate = (100 - latest_discount) / 100
+                discounted_total = round(original_total * discount_rate, 2)
+                self.total_price_label.config(
+                    text=f"Original Price: ${original_total:.2f}\nAfter {latest_discount}% Discount: ${discounted_total:.2f}"
+                )
+            else:
+                self.total_price_label.config(
+                    text=f"Original Price: ${original_total:.2f}\nNo discount available at the moment."
+                )
+        else:
+            self.total_price_label.config(text=f"Total Price: ${original_total:.2f}")
 
     def go_to_payment(self):
         total = self.total_price_label.cget("text")
@@ -498,7 +516,17 @@ class TicketingSystemApp:
         try:
             orders = load_data("orders.pkl")
             ticket_summary = {t: int(e.get()) for t, e in self.ticket_quantities.items() if int(e.get()) > 0}
-            total_price = float(total_text.replace("$", ""))
+            original_price = float(total_text.replace("$", ""))
+
+            # Load latest discount (if any)
+            discounts = load_data("discounts.pkl")
+            if discounts:
+                latest_discount = discounts[-1].get("discount", 0)
+                discount_rate = (100 - latest_discount) / 100
+                total_price = round(original_price * discount_rate, 2)
+            else:
+                total_price = original_price
+
             now = datetime.now()
             order_id = now.strftime("ORD%Y%m%d%H%M%S")
 
@@ -537,8 +565,10 @@ class TicketingSystemApp:
             receipt_text += "Tickets Purchased:\n"
             for t_type, qty in ticket_summary.items():
                 receipt_text += f"  - {t_type}: {qty} ticket(s)\n"
-            receipt_text += f"Total: ${total_price:.2f}\n"
-
+            receipt_text += f"Original Total: ${original_price:.2f}\n"
+            if total_price != original_price:
+                receipt_text += f"Discount Applied: {latest_discount}%\n"
+            receipt_text += f"Final Total: ${total_price:.2f}\n"
 
             messagebox.showinfo("Purchase Confirmed", f"{receipt_text}")
             self.payment_frame.pack_forget()

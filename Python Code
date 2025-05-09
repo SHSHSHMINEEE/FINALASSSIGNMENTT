@@ -196,6 +196,8 @@ class Event:  # Event Class # Event class to represent an event that contains ti
         self.description = description  # Event details
         self.tickets_available = tickets_available  # Number of available tickets
         self.ticketsList = []  # Composition: list of Ticket objects
+        self.userList = userList  # List of User objects
+
 
     def getEventId(self):  # Getter for event_id
         return self.event_id  # Return the event's unique ID
@@ -238,6 +240,13 @@ class Event:  # Event Class # Event class to represent an event that contains ti
 
     def setTicketsAvailable(self, tickets_available):
         self.tickets_available = tickets_available
+
+
+    def getUserList(self):  # Getter for user list
+        return self.userList  # Return the list of users
+
+    def setUserList(self, userList):  # Setter for user list
+        self.userList = userList  # Set the list of users
 
     def eventDetails(self):  # Method to return a formatted string of event details
         return (f"Event ID: {self.event_id}\n"
